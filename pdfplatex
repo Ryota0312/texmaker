@@ -1,0 +1,105 @@
+#!/bin/bash
+
+SH_PATH=$(dirname $0)
+
+source $SH_PATH/color_run.sh
+
+export TEXINPUTS=$TEXINPUTS:$SH_PATH/texsty/sty
+export BSTINPUTS=$BSTINPUTS:$SH_PATH/texsty/bst
+export BIBINPUTS=$BIBINPUTS:$SH_PATH/texsty/bib
+export TEXINPUTS=$TEXINPUTS:'.//;'
+
+clean="FALSE"
+preview="FALSE"
+bibtex="FALSE"
+
+bib_warning="FALSE"
+
+show_help(){
+    echo "Usage: pdfplatex [OPTION]... [FILE]"
+    echo -e "Processing TEX file and output as PDF format.\n"
+    echo "Options:"
+    echo "  -r : Remove temporary file after compilation."
+    echo "  -p : Display the document after compilation."
+    echo -e "  -b : Use pbibtex.\n"
+    echo -e "  --bibedit : Edit mybibdata.bib ["$SH_PATH"/texsty/bib/mybibdata.bib]\n"
+    echo "Setting files:"
+    echo "  Style file : "$SH_PATH"/texsty/sty"
+    echo "  Bib style file : "$SH_PATH"/texsty/bst"
+    echo "  bibliography data : "$SH_PATH"/texsty/bib/mybibdata.bib"
+    exit 0
+}
+
+while getopts "rpbh-:" OPT
+do
+    case $OPT in
+    -)
+        case "${OPTARG}" in
+            bibedit)
+                emacs $SH_PATH/texsty/bib/mybibdata.bib &
+		exit 0
+                ;;
+	    help)
+		show_help
+		;;
+        esac
+        ;;
+    r) clean="TRUE"
+       ;;
+    p) preview="TRUE"
+       ;;
+    b) bibtex="TRUE"
+       ;;
+    h) show_help
+       ;;
+    ?) echo $(colored $red "It contains invalid option.")
+    echo $(colored $red "Try 'pdfplatex -h' or 'pdfplatex --help' for more information.")
+    exit 0
+       ;;
+    esac
+done
+
+shift $(($OPTIND - 1))
+FILE=$*
+FILE="${FILE%.*}"
+
+# ---------------processing----------------------
+
+PLATEX="platex -interaction=nonstopmode"
+BIBTEX="pbibtex"
+DVIPDFMX="dvipdfmx -p a4"
+
+run $PLATEX $FILE.tex
+if [ "$bibtex" = "TRUE" ]
+then
+    run $BIBTEX $FILE
+    run $PLATEX $FILE.tex
+else
+    grep "bibliography" $FILE.tex -q
+    if [ $? -eq 0 ]
+    then
+	bib_warning="TRUE"
+    fi
+fi
+run $PLATEX $FILE.tex
+run $DVIPDFMX $FILE
+
+# -----------------------------------------------
+
+if [ "$bib_warning" = "TRUE" ]
+then
+    echo $(colored $yellow "[Warning] : Dispite using bibliography in this file, you did not execute 'pbibtex'. Please add option '-b' if you want to use 'pbibtex'.")
+fi
+
+if [ "$clean" = "TRUE" ]
+then
+    rm -f *.aux *.bak *.bbl *.blg *.dvi *.idx *.ilg *.ind *.lnk *.lof *.log *.lot *.synctex *.toc *~ *.out
+    echo $(colored $magenta "Removed temporary files.")
+fi
+
+echo $(colored $green "Completed.")
+
+if [ "$preview" = "TRUE" ]
+then
+    evince $FILE.pdf &
+fi

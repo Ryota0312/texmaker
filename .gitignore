@@ -1,0 +1,6 @@
+texsty/bib/*
+!.keep
+texsty/bst/*
+!.keep
+texsty/sty/*
+!.keep
